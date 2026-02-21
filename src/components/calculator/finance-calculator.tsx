@@ -25,7 +25,6 @@ import {
   Calculator,
   Video,
   Users,
-  Plane,
   Clapperboard,
   TrendingUp,
   TrendingDown,
@@ -52,13 +51,13 @@ const BENCHMARKS = {
   workingDaysPerMonth: 20,
 };
 
-// Team daily rates based on monthly salaries
+// Team hourly rates based on monthly salaries (160 working hours/month)
 const TEAM_RATES = {
-  andrew: { name: "Andrew", monthly: 450000, daily: 22500 },
-  david: { name: "David", monthly: 450000, daily: 22500 },
-  robert: { name: "Robert", monthly: 340000, daily: 17000 },
-  paulina: { name: "Paulina", monthly: 300000, daily: 15000 },
-  yuki: { name: "Yuki", monthly: 220000, daily: 11000 },
+  andrew: { name: "Andrew", monthly: 450000, hourly: 2813 },
+  david: { name: "David", monthly: 450000, hourly: 2813 },
+  robert: { name: "Robert", monthly: 340000, hourly: 2125 },
+  paulina: { name: "Paulina", monthly: 300000, hourly: 1875 },
+  yuki: { name: "Yuki", monthly: 220000, hourly: 1375 },
 };
 
 function formatJPY(value: number): string {
@@ -219,7 +218,7 @@ const JOB_PRESETS: Record<
     equipment: number;
     outsourcing: number;
     other: number;
-    days: number;
+    hours: number;
   }
 > = {
   blank: {
@@ -230,7 +229,7 @@ const JOB_PRESETS: Record<
     equipment: 0,
     outsourcing: 0,
     other: 0,
-    days: 3,
+    hours: 24,
   },
   "brand-video-large": {
     label: "Brand Video (Large) — e.g. HGI Kyoto ¥3.4M",
@@ -240,7 +239,7 @@ const JOB_PRESETS: Record<
     equipment: 100000,
     outsourcing: 150000,
     other: 50000,
-    days: 8,
+    hours: 64,
   },
   "brand-video-medium": {
     label: "Brand Video (Medium) — e.g. Hilton MICE ¥2M",
@@ -250,7 +249,7 @@ const JOB_PRESETS: Record<
     equipment: 50000,
     outsourcing: 80000,
     other: 20000,
-    days: 5,
+    hours: 40,
   },
   "event-coverage": {
     label: "Event / Conference — e.g. Fukuoka F&B ¥955K",
@@ -260,7 +259,7 @@ const JOB_PRESETS: Record<
     equipment: 30000,
     outsourcing: 50000,
     other: 20000,
-    days: 3,
+    hours: 24,
   },
   "small-video": {
     label: "Small Project — e.g. Seeds ¥825K",
@@ -270,7 +269,7 @@ const JOB_PRESETS: Record<
     equipment: 20000,
     outsourcing: 20000,
     other: 10000,
-    days: 2,
+    hours: 16,
   },
   "multi-day-shoot": {
     label: "Multi-Day Shoot — e.g. Alan Watts ¥1.5M",
@@ -280,13 +279,13 @@ const JOB_PRESETS: Record<
     equipment: 80000,
     outsourcing: 80000,
     other: 40000,
-    days: 5,
+    hours: 40,
   },
 };
 
 export default function FinanceCalculator() {
   const [showUSD, setShowUSD] = useState(false);
-  const [includeOverhead, setIncludeOverhead] = useState(true);
+  const [includeTeamTime, setIncludeTeamTime] = useState(true);
 
   // Project details
   const [projectName, setProjectName] = useState("");
@@ -303,13 +302,13 @@ export default function FinanceCalculator() {
   const [outsourcingCost, setOutsourcingCost] = useState(80000);
   const [otherDirectCosts, setOtherDirectCosts] = useState(20000);
 
-  // Time Investment
-  const [totalDays, setTotalDays] = useState(5);
-  const [andrewDays, setAndrewDays] = useState(2);
-  const [davidDays, setDavidDays] = useState(3);
-  const [robertDays, setRobertDays] = useState(2);
-  const [paulinaDays, setPaulinaDays] = useState(0);
-  const [yukiDays, setYukiDays] = useState(0);
+  // Time Investment (hours)
+  const [totalHours, setTotalHours] = useState(40);
+  const [andrewHours, setAndrewHours] = useState(16);
+  const [davidHours, setDavidHours] = useState(24);
+  const [robertHours, setRobertHours] = useState(16);
+  const [paulinaHours, setPaulinaHours] = useState(0);
+  const [yukiHours, setYukiHours] = useState(0);
 
   const loadPreset = (presetKey: string) => {
     const preset = JOB_PRESETS[presetKey];
@@ -320,7 +319,7 @@ export default function FinanceCalculator() {
     setEquipmentCost(preset.equipment);
     setOutsourcingCost(preset.outsourcing);
     setOtherDirectCosts(preset.other);
-    setTotalDays(preset.days);
+    setTotalHours(preset.hours);
   };
 
   const resetAll = () => {
@@ -333,12 +332,12 @@ export default function FinanceCalculator() {
     setEquipmentCost(50000);
     setOutsourcingCost(80000);
     setOtherDirectCosts(20000);
-    setTotalDays(5);
-    setAndrewDays(2);
-    setDavidDays(3);
-    setRobertDays(2);
-    setPaulinaDays(0);
-    setYukiDays(0);
+    setTotalHours(40);
+    setAndrewHours(16);
+    setDavidHours(24);
+    setRobertHours(16);
+    setPaulinaHours(0);
+    setYukiHours(0);
   };
 
   const calculations = useMemo(() => {
@@ -351,39 +350,32 @@ export default function FinanceCalculator() {
     const grossMargin =
       quoteAmount > 0 ? (grossProfit / quoteAmount) * 100 : 0;
 
-    // Team time cost (opportunity cost based on salary allocation)
-    const teamTimeCost =
-      andrewDays * TEAM_RATES.andrew.daily +
-      davidDays * TEAM_RATES.david.daily +
-      robertDays * TEAM_RATES.robert.daily +
-      paulinaDays * TEAM_RATES.paulina.daily +
-      yukiDays * TEAM_RATES.yuki.daily;
-
-    // Overhead allocation (share of monthly overhead based on days used)
-    const overheadPerDay =
-      BENCHMARKS.monthlyOverhead / BENCHMARKS.workingDaysPerMonth;
-    const overheadAllocation = includeOverhead
-      ? totalDays * overheadPerDay
+    // Team time cost (opportunity cost based on hourly salary allocation)
+    const teamTimeCost = includeTeamTime
+      ? andrewHours * TEAM_RATES.andrew.hourly +
+        davidHours * TEAM_RATES.david.hourly +
+        robertHours * TEAM_RATES.robert.hourly +
+        paulinaHours * TEAM_RATES.paulina.hourly +
+        yukiHours * TEAM_RATES.yuki.hourly
       : 0;
 
-    // Fully loaded costs
-    const fullyLoadedCosts =
-      totalDirectCosts + teamTimeCost + overheadAllocation;
+    // Fully loaded costs (direct + team time, no overhead)
+    const fullyLoadedCosts = totalDirectCosts + teamTimeCost;
 
     // Net profit
     const netProfit = quoteAmount - fullyLoadedCosts;
     const netMargin =
       quoteAmount > 0 ? (netProfit / quoteAmount) * 100 : 0;
 
-    // Daily revenue (revenue per day of work)
-    const dailyRevenue = totalDays > 0 ? quoteAmount / totalDays : 0;
-    const dailyProfit = totalDays > 0 ? grossProfit / totalDays : 0;
+    // Hourly revenue
+    const hourlyRevenue = totalHours > 0 ? quoteAmount / totalHours : 0;
+    const hourlyProfit = totalHours > 0 ? grossProfit / totalHours : 0;
 
-    // Revenue per team-member-day
-    const totalTeamDays =
-      andrewDays + davidDays + robertDays + paulinaDays + yukiDays;
-    const revenuePerTeamDay =
-      totalTeamDays > 0 ? quoteAmount / totalTeamDays : 0;
+    // Revenue per team-member-hour
+    const totalTeamHours =
+      andrewHours + davidHours + robertHours + paulinaHours + yukiHours;
+    const revenuePerTeamHour =
+      totalTeamHours > 0 ? quoteAmount / totalTeamHours : 0;
 
     // Margin health
     const marginRating =
@@ -400,14 +392,13 @@ export default function FinanceCalculator() {
       grossProfit,
       grossMargin,
       teamTimeCost,
-      overheadAllocation,
       fullyLoadedCosts,
       netProfit,
       netMargin,
-      dailyRevenue,
-      dailyProfit,
-      revenuePerTeamDay,
-      totalTeamDays,
+      hourlyRevenue,
+      hourlyProfit,
+      revenuePerTeamHour,
+      totalTeamHours,
       marginRating,
     };
   }, [
@@ -417,13 +408,13 @@ export default function FinanceCalculator() {
     equipmentCost,
     outsourcingCost,
     otherDirectCosts,
-    totalDays,
-    andrewDays,
-    davidDays,
-    robertDays,
-    paulinaDays,
-    yukiDays,
-    includeOverhead,
+    totalHours,
+    andrewHours,
+    davidHours,
+    robertHours,
+    paulinaHours,
+    yukiHours,
+    includeTeamTime,
   ]);
 
   const isProfitable = calculations.grossProfit > 0;
@@ -546,7 +537,7 @@ export default function FinanceCalculator() {
                 Math.abs(calculations.netProfit),
                 showUSD
               )}
-              subtitle={`${formatPercent(calculations.netMargin)} after overhead`}
+              subtitle={`${formatPercent(calculations.netMargin)} after all costs`}
               icon={
                 isNetProfitable ? (
                   <TrendingUp className="size-4 text-muted-foreground" />
@@ -558,17 +549,17 @@ export default function FinanceCalculator() {
               badge={isNetProfitable ? "Take it" : "Pass"}
             />
             <MetricCard
-              title="Profit per Day"
+              title="Profit per Hour"
               value={formatCurrency(
-                Math.abs(calculations.dailyProfit),
+                Math.abs(calculations.hourlyProfit),
                 showUSD
               )}
-              subtitle={`${totalDays} working days`}
+              subtitle={`${totalHours} total hours`}
               icon={<Clock className="size-4 text-muted-foreground" />}
               trend={
-                calculations.dailyProfit > 200000
+                calculations.hourlyProfit > 25000
                   ? "positive"
-                  : calculations.dailyProfit > 100000
+                  : calculations.hourlyProfit > 12500
                     ? "neutral"
                     : "negative"
               }
@@ -737,21 +728,22 @@ export default function FinanceCalculator() {
                 )}
                 <Separator />
                 <NumberInput
-                  label="Total Working Days"
-                  value={totalDays}
-                  onChange={setTotalDays}
-                  suffix="days"
+                  label="Total Hours (all team combined)"
+                  value={totalHours}
+                  onChange={setTotalHours}
+                  suffix="hrs"
                   min={1}
-                  max={60}
+                  max={500}
+                  step={4}
                   hint="Pre-production + shoot + post-production"
                 />
                 <div className="rounded-lg bg-muted p-3">
                   <div className="flex justify-between text-xs">
                     <span className="text-muted-foreground">
-                      Revenue per day
+                      Revenue per hour
                     </span>
                     <span className="font-medium">
-                      {formatCurrency(calculations.dailyRevenue, showUSD)}
+                      {formatCurrency(calculations.hourlyRevenue, showUSD)}
                     </span>
                   </div>
                 </div>
@@ -842,49 +834,58 @@ export default function FinanceCalculator() {
             </Card>
           </div>
 
-          {/* Column 3: Team Time & Fully Loaded */}
+          {/* Column 3: Team Time & P&L */}
           <div className="space-y-4">
             <Card>
               <CardHeader>
-                <CardTitle className="flex items-center gap-2 text-sm">
-                  <Users className="size-4" />
-                  Team Time Investment
-                </CardTitle>
-                <CardDescription className="text-xs">
-                  Who&apos;s working on this? (salary-based opportunity cost)
-                </CardDescription>
+                <div className="flex items-center justify-between">
+                  <div>
+                    <CardTitle className="flex items-center gap-2 text-sm">
+                      <Users className="size-4" />
+                      Team Time Investment
+                    </CardTitle>
+                    <CardDescription className="text-xs">
+                      Toggle to include staff costs in net profit
+                    </CardDescription>
+                  </div>
+                  <Switch
+                    id="team-toggle"
+                    checked={includeTeamTime}
+                    onCheckedChange={setIncludeTeamTime}
+                  />
+                </div>
               </CardHeader>
               <CardContent className="space-y-3">
                 {[
                   {
                     name: "Andrew",
                     rate: TEAM_RATES.andrew,
-                    value: andrewDays,
-                    setter: setAndrewDays,
+                    value: andrewHours,
+                    setter: setAndrewHours,
                   },
                   {
                     name: "David",
                     rate: TEAM_RATES.david,
-                    value: davidDays,
-                    setter: setDavidDays,
+                    value: davidHours,
+                    setter: setDavidHours,
                   },
                   {
                     name: "Robert",
                     rate: TEAM_RATES.robert,
-                    value: robertDays,
-                    setter: setRobertDays,
+                    value: robertHours,
+                    setter: setRobertHours,
                   },
                   {
                     name: "Paulina",
                     rate: TEAM_RATES.paulina,
-                    value: paulinaDays,
-                    setter: setPaulinaDays,
+                    value: paulinaHours,
+                    setter: setPaulinaHours,
                   },
                   {
                     name: "Yuki",
                     rate: TEAM_RATES.yuki,
-                    value: yukiDays,
-                    setter: setYukiDays,
+                    value: yukiHours,
+                    setter: setYukiHours,
                   },
                 ].map((member) => (
                   <div
@@ -901,16 +902,17 @@ export default function FinanceCalculator() {
                         member.setter(Number(e.target.value) || 0)
                       }
                       min={0}
-                      max={30}
-                      step={0.5}
+                      max={200}
+                      step={1}
                       className="h-8 w-20 text-sm text-center"
+                      disabled={!includeTeamTime}
                     />
                     <span className="text-[10px] text-muted-foreground">
-                      days × {formatJPY(member.rate.daily)}/day
+                      hrs × {formatJPY(member.rate.hourly)}/hr
                     </span>
                     <span className="ml-auto text-xs font-medium">
                       {formatCurrency(
-                        member.value * member.rate.daily,
+                        includeTeamTime ? member.value * member.rate.hourly : 0,
                         showUSD
                       )}
                     </span>
@@ -919,79 +921,26 @@ export default function FinanceCalculator() {
                 <Separator />
                 <div className="flex justify-between text-sm font-medium">
                   <span>
-                    Team Time Cost ({calculations.totalTeamDays} person-days)
+                    Team Time Cost ({calculations.totalTeamHours} person-hrs)
                   </span>
                   <span>
                     {formatCurrency(calculations.teamTimeCost, showUSD)}
                   </span>
                 </div>
-                {calculations.totalTeamDays > 0 && (
+                {calculations.totalTeamHours > 0 && includeTeamTime && (
                   <div className="flex justify-between text-xs text-muted-foreground">
-                    <span>Revenue per team-member-day</span>
+                    <span>Revenue per team-hour</span>
                     <span>
                       {formatCurrency(
-                        calculations.revenuePerTeamDay,
+                        calculations.revenuePerTeamHour,
                         showUSD
                       )}
                     </span>
                   </div>
                 )}
-              </CardContent>
-            </Card>
 
-            {/* Overhead Toggle */}
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2 text-sm">
-                  <Plane className="size-4" />
-                  Overhead Allocation
-                </CardTitle>
-                <CardDescription className="text-xs">
-                  Share of monthly fixed costs (¥2.48M/mo ÷ 20 days)
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-3">
-                <div className="flex items-center justify-between">
-                  <Label
-                    htmlFor="overhead-toggle"
-                    className="text-xs text-muted-foreground"
-                  >
-                    Include overhead in net profit?
-                  </Label>
-                  <Switch
-                    id="overhead-toggle"
-                    checked={includeOverhead}
-                    onCheckedChange={setIncludeOverhead}
-                  />
-                </div>
-                {includeOverhead && (
-                  <div className="rounded-lg bg-muted p-3 space-y-1">
-                    <div className="flex justify-between text-xs">
-                      <span className="text-muted-foreground">
-                        Overhead per day
-                      </span>
-                      <span>
-                        {formatCurrency(
-                          BENCHMARKS.monthlyOverhead /
-                            BENCHMARKS.workingDaysPerMonth,
-                          showUSD
-                        )}
-                      </span>
-                    </div>
-                    <div className="flex justify-between text-xs">
-                      <span className="text-muted-foreground">
-                        × {totalDays} project days
-                      </span>
-                      <span className="font-medium">
-                        {formatCurrency(
-                          calculations.overheadAllocation,
-                          showUSD
-                        )}
-                      </span>
-                    </div>
-                  </div>
-                )}
                 <Separator />
+
                 {/* Final P&L */}
                 <div className="space-y-2">
                   <div className="flex justify-between text-sm">
@@ -1006,21 +955,11 @@ export default function FinanceCalculator() {
                       −{formatCurrency(calculations.totalDirectCosts, showUSD)}
                     </span>
                   </div>
-                  <div className="flex justify-between text-xs text-muted-foreground">
-                    <span>Team Time</span>
-                    <span className="text-red-500">
-                      −{formatCurrency(calculations.teamTimeCost, showUSD)}
-                    </span>
-                  </div>
-                  {includeOverhead && (
+                  {includeTeamTime && (
                     <div className="flex justify-between text-xs text-muted-foreground">
-                      <span>Overhead</span>
+                      <span>Team Time</span>
                       <span className="text-red-500">
-                        −
-                        {formatCurrency(
-                          calculations.overheadAllocation,
-                          showUSD
-                        )}
+                        −{formatCurrency(calculations.teamTimeCost, showUSD)}
                       </span>
                     </div>
                   )}
@@ -1089,17 +1028,12 @@ export default function FinanceCalculator() {
                   value: otherDirectCosts,
                   color: "bg-gray-500",
                 },
-                {
-                  label: "Team Time (salaries)",
-                  value: calculations.teamTimeCost,
-                  color: "bg-indigo-500",
-                },
-                ...(includeOverhead
+                ...(includeTeamTime
                   ? [
                       {
-                        label: "Overhead Share",
-                        value: calculations.overheadAllocation,
-                        color: "bg-slate-400",
+                        label: "Team Time (salaries)",
+                        value: calculations.teamTimeCost,
+                        color: "bg-indigo-500",
                       },
                     ]
                   : []),
