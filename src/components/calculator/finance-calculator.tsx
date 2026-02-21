@@ -207,7 +207,7 @@ function MetricCard({
   );
 }
 
-// Past job presets from 2025 data
+// Presets — Start Fresh, 2025 Average, or specific past job templates
 const JOB_PRESETS: Record<
   string,
   {
@@ -229,7 +229,18 @@ const JOB_PRESETS: Record<
     equipment: 0,
     outsourcing: 0,
     other: 0,
-    hours: 24,
+    hours: 0,
+  },
+  "avg-2025": {
+    // Calculated from 9 actual 2025 jobs: avg revenue ¥1.93M, avg costs ¥512K
+    label: "Pre-fill with 2025 Averages",
+    revenue: 1930000,
+    crew: 190000,
+    travel: 120000,
+    equipment: 55000,
+    outsourcing: 100000,
+    other: 45000,
+    hours: 36,
   },
   "brand-video-large": {
     label: "Brand Video (Large) — e.g. HGI Kyoto ¥3.4M",
@@ -285,6 +296,7 @@ const JOB_PRESETS: Record<
 
 export default function FinanceCalculator() {
   const [showUSD, setShowUSD] = useState(false);
+  const [includeTeamTime, setIncludeTeamTime] = useState(true);
 
   // Project details
   const [projectName, setProjectName] = useState("");
@@ -349,7 +361,7 @@ export default function FinanceCalculator() {
     const grossMargin =
       quoteAmount > 0 ? (grossProfit / quoteAmount) * 100 : 0;
 
-    // Team time cost (opportunity cost based on hourly salary allocation)
+    // Team time cost (always calculated for display)
     const teamTimeCost =
       andrewHours * TEAM_RATES.andrew.hourly +
       davidHours * TEAM_RATES.david.hourly +
@@ -357,8 +369,8 @@ export default function FinanceCalculator() {
       paulinaHours * TEAM_RATES.paulina.hourly +
       yukiHours * TEAM_RATES.yuki.hourly;
 
-    // Fully loaded costs (direct + team time, no overhead)
-    const fullyLoadedCosts = totalDirectCosts + teamTimeCost;
+    // Fully loaded costs — toggle controls whether team time is included in net profit
+    const fullyLoadedCosts = totalDirectCosts + (includeTeamTime ? teamTimeCost : 0);
 
     // Net profit
     const netProfit = quoteAmount - fullyLoadedCosts;
@@ -412,6 +424,7 @@ export default function FinanceCalculator() {
     robertHours,
     paulinaHours,
     yukiHours,
+    includeTeamTime,
   ]);
 
   const isProfitable = calculations.grossProfit > 0;
@@ -529,12 +542,15 @@ export default function FinanceCalculator() {
               }
             />
             <MetricCard
-              title="Net Profit (Fully Loaded)"
+              title={includeTeamTime ? "Net Profit (Fully Loaded)" : "Profit (Excl. Team)"}
               value={formatCurrency(
                 Math.abs(calculations.netProfit),
                 showUSD
               )}
-              subtitle={`${formatPercent(calculations.netMargin)} after all costs`}
+              subtitle={includeTeamTime
+                ? `${formatPercent(calculations.netMargin)} after all costs`
+                : `${formatPercent(calculations.netMargin)} — team costs excluded`
+              }
               icon={
                 isNetProfitable ? (
                   <TrendingUp className="size-4 text-muted-foreground" />
@@ -543,7 +559,10 @@ export default function FinanceCalculator() {
                 )
               }
               trend={isNetProfitable ? "positive" : "negative"}
-              badge={isNetProfitable ? "Take it" : "Pass"}
+              badge={includeTeamTime
+                ? (isNetProfitable ? "Take it" : "Pass")
+                : "Partial"
+              }
             />
             <MetricCard
               title="Profit per Hour"
@@ -762,12 +781,12 @@ export default function FinanceCalculator() {
               </CardHeader>
               <CardContent className="space-y-3">
                 <NumberInput
-                  label="Crew / Extra Staff"
+                  label="Film Crew"
                   value={crewCost}
                   onChange={setCrewCost}
                   prefix="¥"
                   step={10000}
-                  hint="Freelance camera ops, assistants, models"
+                  hint="Futa-san, freelance camera ops, assistants"
                 />
                 <NumberInput
                   label="Travel & Accommodation"
@@ -791,7 +810,7 @@ export default function FinanceCalculator() {
                   onChange={setOutsourcingCost}
                   prefix="¥"
                   step={10000}
-                  hint="Futa, freelance editors, color grading, music"
+                  hint="Freelance editors, color grading, music licensing"
                 />
                 <NumberInput
                   label="Other Direct Costs"
@@ -835,13 +854,27 @@ export default function FinanceCalculator() {
           <div className="space-y-4">
             <Card>
               <CardHeader>
-                <CardTitle className="flex items-center gap-2 text-sm">
-                  <Users className="size-4" />
-                  Team Time Investment
-                </CardTitle>
-                <CardDescription className="text-xs">
-                  Staff salary cost per project (set hours to 0 if not involved)
-                </CardDescription>
+                <div className="flex items-center justify-between">
+                  <div>
+                    <CardTitle className="flex items-center gap-2 text-sm">
+                      <Users className="size-4" />
+                      Team Time Investment
+                    </CardTitle>
+                    <CardDescription className="text-xs">
+                      Include team salary costs in net profit?
+                    </CardDescription>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Label htmlFor="team-toggle" className="text-[10px] text-muted-foreground">
+                      {includeTeamTime ? "ON" : "OFF"}
+                    </Label>
+                    <Switch
+                      id="team-toggle"
+                      checked={includeTeamTime}
+                      onCheckedChange={setIncludeTeamTime}
+                    />
+                  </div>
+                </div>
               </CardHeader>
               <CardContent className="space-y-3">
                 {[
@@ -942,9 +975,9 @@ export default function FinanceCalculator() {
                       −{formatCurrency(calculations.totalDirectCosts, showUSD)}
                     </span>
                   </div>
-                  <div className="flex justify-between text-xs text-muted-foreground">
-                    <span>Team Time</span>
-                    <span className="text-red-500">
+                  <div className={`flex justify-between text-xs text-muted-foreground ${!includeTeamTime ? "line-through opacity-40" : ""}`}>
+                    <span>Team Time {!includeTeamTime && "(excluded)"}</span>
+                    <span className={includeTeamTime ? "text-red-500" : "text-muted-foreground"}>
                       −{formatCurrency(calculations.teamTimeCost, showUSD)}
                     </span>
                   </div>
@@ -989,7 +1022,7 @@ export default function FinanceCalculator() {
             <div className="space-y-3">
               {[
                 {
-                  label: "Crew / Staff",
+                  label: "Film Crew",
                   value: crewCost,
                   color: "bg-blue-500",
                 },
