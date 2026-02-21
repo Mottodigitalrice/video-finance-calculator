@@ -285,7 +285,6 @@ const JOB_PRESETS: Record<
 
 export default function FinanceCalculator() {
   const [showUSD, setShowUSD] = useState(false);
-  const [includeTeamTime, setIncludeTeamTime] = useState(true);
 
   // Project details
   const [projectName, setProjectName] = useState("");
@@ -351,13 +350,12 @@ export default function FinanceCalculator() {
       quoteAmount > 0 ? (grossProfit / quoteAmount) * 100 : 0;
 
     // Team time cost (opportunity cost based on hourly salary allocation)
-    const teamTimeCost = includeTeamTime
-      ? andrewHours * TEAM_RATES.andrew.hourly +
-        davidHours * TEAM_RATES.david.hourly +
-        robertHours * TEAM_RATES.robert.hourly +
-        paulinaHours * TEAM_RATES.paulina.hourly +
-        yukiHours * TEAM_RATES.yuki.hourly
-      : 0;
+    const teamTimeCost =
+      andrewHours * TEAM_RATES.andrew.hourly +
+      davidHours * TEAM_RATES.david.hourly +
+      robertHours * TEAM_RATES.robert.hourly +
+      paulinaHours * TEAM_RATES.paulina.hourly +
+      yukiHours * TEAM_RATES.yuki.hourly;
 
     // Fully loaded costs (direct + team time, no overhead)
     const fullyLoadedCosts = totalDirectCosts + teamTimeCost;
@@ -369,7 +367,7 @@ export default function FinanceCalculator() {
 
     // Hourly revenue
     const hourlyRevenue = totalHours > 0 ? quoteAmount / totalHours : 0;
-    const hourlyProfit = totalHours > 0 ? grossProfit / totalHours : 0;
+    const hourlyProfit = totalHours > 0 ? netProfit / totalHours : 0;
 
     // Revenue per team-member-hour
     const totalTeamHours =
@@ -414,7 +412,6 @@ export default function FinanceCalculator() {
     robertHours,
     paulinaHours,
     yukiHours,
-    includeTeamTime,
   ]);
 
   const isProfitable = calculations.grossProfit > 0;
@@ -838,22 +835,13 @@ export default function FinanceCalculator() {
           <div className="space-y-4">
             <Card>
               <CardHeader>
-                <div className="flex items-center justify-between">
-                  <div>
-                    <CardTitle className="flex items-center gap-2 text-sm">
-                      <Users className="size-4" />
-                      Team Time Investment
-                    </CardTitle>
-                    <CardDescription className="text-xs">
-                      Toggle to include staff costs in net profit
-                    </CardDescription>
-                  </div>
-                  <Switch
-                    id="team-toggle"
-                    checked={includeTeamTime}
-                    onCheckedChange={setIncludeTeamTime}
-                  />
-                </div>
+                <CardTitle className="flex items-center gap-2 text-sm">
+                  <Users className="size-4" />
+                  Team Time Investment
+                </CardTitle>
+                <CardDescription className="text-xs">
+                  Staff salary cost per project (set hours to 0 if not involved)
+                </CardDescription>
               </CardHeader>
               <CardContent className="space-y-3">
                 {[
@@ -905,14 +893,13 @@ export default function FinanceCalculator() {
                       max={200}
                       step={1}
                       className="h-8 w-20 text-sm text-center"
-                      disabled={!includeTeamTime}
                     />
                     <span className="text-[10px] text-muted-foreground">
                       hrs × {formatJPY(member.rate.hourly)}/hr
                     </span>
                     <span className="ml-auto text-xs font-medium">
                       {formatCurrency(
-                        includeTeamTime ? member.value * member.rate.hourly : 0,
+                        member.value * member.rate.hourly,
                         showUSD
                       )}
                     </span>
@@ -927,7 +914,7 @@ export default function FinanceCalculator() {
                     {formatCurrency(calculations.teamTimeCost, showUSD)}
                   </span>
                 </div>
-                {calculations.totalTeamHours > 0 && includeTeamTime && (
+                {calculations.totalTeamHours > 0 && (
                   <div className="flex justify-between text-xs text-muted-foreground">
                     <span>Revenue per team-hour</span>
                     <span>
@@ -955,14 +942,12 @@ export default function FinanceCalculator() {
                       −{formatCurrency(calculations.totalDirectCosts, showUSD)}
                     </span>
                   </div>
-                  {includeTeamTime && (
-                    <div className="flex justify-between text-xs text-muted-foreground">
-                      <span>Team Time</span>
-                      <span className="text-red-500">
-                        −{formatCurrency(calculations.teamTimeCost, showUSD)}
-                      </span>
-                    </div>
-                  )}
+                  <div className="flex justify-between text-xs text-muted-foreground">
+                    <span>Team Time</span>
+                    <span className="text-red-500">
+                      −{formatCurrency(calculations.teamTimeCost, showUSD)}
+                    </span>
+                  </div>
                   <Separator />
                   <div
                     className={`rounded-lg p-4 ${isNetProfitable ? "bg-emerald-50 border border-emerald-200" : "bg-red-50 border border-red-200"}`}
@@ -1028,15 +1013,11 @@ export default function FinanceCalculator() {
                   value: otherDirectCosts,
                   color: "bg-gray-500",
                 },
-                ...(includeTeamTime
-                  ? [
-                      {
-                        label: "Team Time (salaries)",
-                        value: calculations.teamTimeCost,
-                        color: "bg-indigo-500",
-                      },
-                    ]
-                  : []),
+                {
+                  label: "Team Time (salaries)",
+                  value: calculations.teamTimeCost,
+                  color: "bg-indigo-500",
+                },
               ].map((item) => {
                 const pct =
                   calculations.fullyLoadedCosts > 0
